@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Drawing App</title>
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+    }
+
+    #drawingCanvas {
+      display: block;
+      border: 1px solid #000;
+    }
+
+    #recommendedVideo {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="drawingCanvas" width="750" height="750"></canvas>
+  <input type="color" id="colorPicker" value="#000000">
+  <input type="range" id="brushSize" min="1" max="20" value="5">
+  <button id="eraserButton">Eraser</button>
+  <button id="undoButton">Undo</button>
+  <button id="completeButton">Complete</button>
+  <div id="recommendedVideo"></div>
+
+  <script>
+    const canvas = document.getElementById('drawingCanvas');
+    const context = canvas.getContext('2d');
+    const colorPicker = document.getElementById('colorPicker');
+    const brushSize = document.getElementById('brushSize');
+    const eraserButton = document.getElementById('eraserButton');
+    const undoButton = document.getElementById('undoButton');
+    const completeButton = document.getElementById('completeButton');
+    const recommendedVideoContainer = document.getElementById('recommendedVideo');
+
+    let isDrawing = false;
+    let brushColor = '#000000';
+    let brushWidth = 5;
+    let eraserMode = false;
+    let drawingHistory = [];
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    colorPicker.addEventListener('input', updateBrushColor);
+    brushSize.addEventListener('input', updateBrushSize);
+    eraserButton.addEventListener('click', toggleEraserMode);
+    undoButton.addEventListener('click', undoDrawing);
+    completeButton.addEventListener('click', completeDrawing);
+
+    function startDrawing(e) {
+      isDrawing = true;
+      [prevX, prevY] = [e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop];
+      context.lineJoin = 'round';
+      context.lineCap = 'round';
+      context.strokeStyle = eraserMode ? 'white' : brushColor;
+      context.lineWidth = brushWidth;
+      context.beginPath();
+      context.moveTo(prevX, prevY);
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+
+      const [currentX, currentY] = [e.clientX - canvas.offsetLeft, e.clientY - canvas.offsetTop];
+
+      context.lineTo(currentX, currentY);
+      context.stroke();
+    }
+
+    function stopDrawing() {
+      isDrawing = false;
+      drawingHistory.push(canvas.toDataURL()); // Save current state for undo
+    }
+
+    function updateBrushColor() {
+      brushColor = colorPicker.value;
+    }
+
+    function updateBrushSize() {
+      brushWidth = brushSize.value;
+    }
+
+    function toggleEraserMode() {
+      eraserMode = !eraserMode;
+      eraserButton.textContent = eraserMode ? 'Brush' : 'Eraser';
+      context.strokeStyle = eraserMode ? 'white' : brushColor;
+    }
+
+    function undoDrawing() {
+      if (drawingHistory.length > 1) {
+        drawingHistory.pop();
+        const img = new Image();
+        img.onload = function () {
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(img, 0, 0);
+        };
+        img.src = drawingHistory[drawingHistory.length - 1];
+      }
+    }
+
+    function completeDrawing() {
+      // Calculate average saturation of used colors
+      const avgSaturation = calculateAverageSaturation();
+      recommendVideo(avgSaturation);
+    }
+
+    function calculateAverageSaturation() {
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let totalSaturation = 0;
+      let nonEmptyPixelCount = 0;
+
+      for (let i = 0; i < imageData.length; i += 4) {
+        const alpha = imageData[i + 3]; // alpha value (transparency)
+        if (alpha > 0) {
+          const [r, g, b] = imageData.slice(i, i + 3);
+          const hsl = rgbToHsl(r, g, b);
+          totalSaturation += hsl[1]; // Add the saturation value
+          nonEmptyPixelCount++;
+        }
+      }
+
+      // Calculate average saturation
+      const avgSaturation = nonEmptyPixelCount > 0 ? totalSaturation / nonEmptyPixelCount : 0;
+      return avgSaturation;
+    }
+
+    function rgbToHsl(r, g, b) {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h, s, l = (max + min) / 2;
+
+      if (max === min) {
+        h = s = 0; // achromatic
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+        switch (max) {
+          case r:
+            h = (g - b) / d + (g < b ? 6 : 0);
+            break;
+          case g:
+            h = (b - r) / d + 2;
+            break;
+          case b:
+            h = (r - g) / d + 4;
+            break;
+        }
+
+        h /= 6;
+      }
+
+      return [h, s, l];
+    }
+
+    function recommendVideo(avgSaturation) {
+      let videoUrl;
+
+      if (avgSaturation > 0.7) {
+        videoUrl = 'https://youtu.be/a_80o2lDYec?feature=shared';
+      } else if (avgSaturation > 0.4) {
+        videoUrl = 'https://youtu.be/-eiEocMgBEo?feature=shared';
+      } else {
+        videoUrl = 'https://youtu.be/maVxoI9UJik?feature=shared';
+      }
+
+      // Display the recommended video in a new tab
+      window.open(videoUrl);
+    }
+  </script>
+</body>
+</html>
